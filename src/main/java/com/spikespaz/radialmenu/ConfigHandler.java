@@ -1,5 +1,6 @@
 package com.spikespaz.radialmenu;
 
+import com.spikespaz.radialmenu.gui.GuiRadialButton;
 import lombok.Getter;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.util.SoundEvent;
@@ -16,6 +17,8 @@ public final class ConfigHandler {
     public static final LabelOptions LABEL = LabelOptions.INSTANCE;
     @Config.LangKey(LANG_KEY_PREFIX + ".category.button")
     public static final ButtonOptions BUTTON = ButtonOptions.INSTANCE;
+    @Config.LangKey(LANG_KEY_PREFIX + ".category.animation")
+    public static final AnimationOptions ANIMATION = AnimationOptions.INSTANCE;
     @Config.LangKey(LANG_KEY_PREFIX + ".category.sound")
     public static final SoundOptions SOUND = SoundOptions.INSTANCE;
 
@@ -122,6 +125,33 @@ public final class ConfigHandler {
         public int getButtonBgHoverColor() {
             return (int) (this.buttonBgHoverOpacity * 0xFF) << 24 | (int) Long.parseLong(this.buttonBgHoverColor, 16);
         }
+    }
+
+    public static final class AnimationOptions {
+        @Config.Ignore
+        public static final AnimationOptions INSTANCE = new AnimationOptions();
+
+        @Getter
+        @Config.LangKey(LANG_KEY_PREFIX + ".show_animation_duration")
+        @Config.Comment("Duration (in milliseconds) of the opacity fade animation when the radial menu is shown or hidden.")
+        @Config.RangeInt(min = 0, max = 2000)
+        public int showDuration = 100;
+
+        @Getter
+        @Config.LangKey(LANG_KEY_PREFIX + ".hover_animation_duration")
+        @Config.Comment("Duration (in milliseconds) of the color fade animation when a button is hovered or un-hovered.")
+        @Config.RangeInt(min = 0, max = 2000)
+        public int hoverDuration = 200;
+
+        @Getter
+        @Config.LangKey(LANG_KEY_PREFIX + ".show_animation_mode")
+        @Config.Comment("Mode of the opacity fade animation when when the radial menu is shown or hidden.")
+        public GuiRadialButton.FadeMode showAnimationMode = GuiRadialButton.FadeMode.FADE_OUT;
+
+        @Getter
+        @Config.LangKey(LANG_KEY_PREFIX + ".hover_animation_mode")
+        @Config.Comment("Mode of the color fade animation when a button is hovered or un-hovered.")
+        public GuiRadialButton.FadeMode hoverAnimationMode = GuiRadialButton.FadeMode.FADE_BOTH;
     }
 
     public static final class SoundOptions {

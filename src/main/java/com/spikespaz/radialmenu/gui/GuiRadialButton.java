@@ -1,15 +1,20 @@
 package com.spikespaz.radialmenu.gui;
 
 import com.spikespaz.radialmenu.MathHelper;
+import com.spikespaz.radialmenu.Utilities;
+import lombok.Getter;
+import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.client.audio.SoundHandler;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderItem;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.init.SoundEvents;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
@@ -20,29 +25,55 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class GuiRadialButton extends GuiButton {
     private static final Minecraft mc = Minecraft.getMinecraft();
     protected final RenderItem itemRender;
+    private final int showDuration;
+    private final int hoverDuration;
+    private final FadeMode showFadeMode;
+    private final FadeMode hoverFadeMode;
     public int radius;
     public int deadRadius;
     public int thickness;
     public int sliceCount;
     public int sliceNum;
-    public int color;
+    public int normalColor;
     public int hoverColor;
+    public int currentColor;
     public double[] centroid;
     protected ItemStack itemIcon;
     protected ResourceLocation imageIcon;
     public KeyBinding keyBinding;
     private SoundEvent pressSound;
     private float pressSoundPitch;
+    private long firstShownTime;
+    private long lastHoverChange;
+    private int hoverFadeTime;
 
-    public GuiRadialButton(int buttonId, int radius, int deadRadius, int thickness, int color, int hoverColor) {
+    public enum FadeMode {
+        FADE_IN, FADE_OUT, FADE_BOTH, FADE_NONE;
+    }
+
+    public GuiRadialButton(int buttonId, int radius, int deadRadius, int thickness, int normalColor, int hoverColor, int showDuration, int hoverDuration, FadeMode showFadeMode, FadeMode hoverFadeMode) {
         super(buttonId, 0, 0, "");
         this.itemRender = mc.getRenderItem();
         this.id = buttonId;
         this.radius = radius;
         this.deadRadius = deadRadius;
         this.thickness = thickness;
-        this.color = color;
+        this.normalColor = normalColor;
         this.hoverColor = hoverColor;
+        this.showDuration = showDuration;
+        this.hoverDuration = hoverDuration;
+        this.showFadeMode = showFadeMode;
+        this.hoverFadeMode = hoverFadeMode;
+    }
+
+    public void onMouseOver() {
+        this.hovered = true;
+        this.lastHoverChange = Minecraft.getSystemTime();
+    }
+
+    public void onMouseAway() {
+        this.hovered = false;
+        this.lastHoverChange = Minecraft.getSystemTime();
     }
 
     @Override
@@ -50,7 +81,58 @@ public class GuiRadialButton extends GuiButton {
     public void drawButton(Minecraft mc, int mouseX, int mouseY, float partialTicks) {
         if (!this.visible) return;
 
-        this.hovered = this.isMouseOver(mc, mouseX, mouseY);
+        final boolean hovered;
+
+        if (this.firstShownTime == 0) {
+            hovered = false;
+            this.firstShownTime = Minecraft.getSystemTime();
+        } else
+            hovered = this.isMouseOver(mc, mouseX, mouseY);
+
+        if (!this.hovered && hovered)
+            this.onMouseOver();
+        else if (this.hovered && !hovered)
+            this.onMouseAway();
+
+        final double timeNow = Minecraft.getSystemTime();
+
+//        final double showFadeFactor = Math.max(0, Math.min(1, (timeNow - this.firstShownTime) / this.showDuration));
+        final double hoverFadeFactor = Math.min((timeNow - this.lastHoverChange) / this.hoverDuration, 1);
+
+        if (this.id == 0) {
+            System.out.println("Time since last hover change: " + (timeNow - this.lastHoverChange));
+            System.out.println("Hover fade factor: " + hoverFadeFactor);
+        }
+
+        final int normalColor = this.normalColor & 0xFFFFFF;
+        final int normalAlpha = this.normalColor >> 24 & 0xFF;
+        final int hoverColor = this.hoverColor & 0xFFFFFF;
+        final int hoverAlpha = this.hoverColor >> 24 & 0xFF;
+        final int currentColor = this.currentColor & 0xFFFFFF;
+        final int currentAlpha = this.currentColor >> 24 & 0xFF;
+
+        int alpha, color;
+
+        if (this.hovered)
+            if (this.hoverFadeMode == FadeMode.FADE_BOTH || this.hoverFadeMode == FadeMode.FADE_IN) {
+                alpha = Utilities.interpolateValue(currentAlpha, hoverAlpha, hoverFadeFactor);
+                color = Utilities.interpolateColor(currentColor, hoverColor, hoverFadeFactor);
+            } else {
+                alpha = hoverAlpha;
+                color = hoverColor;
+            }
+        else
+            if (this.hoverFadeMode == FadeMode.FADE_BOTH || this.hoverFadeMode == FadeMode.FADE_OUT) {
+                alpha = Utilities.interpolateValue(currentAlpha, normalAlpha, hoverFadeFactor);
+                color = Utilities.interpolateColor(currentColor, normalColor, hoverFadeFactor);
+            } else {
+                alpha = normalAlpha;
+                color = normalColor;
+            }
+
+        this.currentColor = (alpha << 24) + color;
+
+//        alpha = (int) Utilities.interpolateValue(0, alpha, showFadeFactor);
 
         final ScaledResolution scaledRes = new ScaledResolution(mc);
 
@@ -75,8 +157,7 @@ public class GuiRadialButton extends GuiButton {
         double[][] vertices = new double[][]{{x0, y0}, {x1, y1}, {x2, y2}, {x3, y3}};
 
         this.centroid = MathHelper.centroid(vertices);
-
-        RenderHelper.drawPoly(vertices, this.hovered ? this.hoverColor : this.color);
+        RenderHelper.drawPoly(vertices, this.currentColor);
 
         // Uncomment to draw points in red
 //        RenderHelper.drawCircle(x0, y0, 2D, 10, 0xFFFF0000);
